@@ -3,7 +3,7 @@ name: Build & Release Edge
 on:
   push:
     branches:
-      - "main"
+      - "nosync"
 jobs:
   release:
     runs-on: ubuntu-latest

@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: ["main"]
+    branches: ["nosync"]
   pull_request:
-    branches: ["main"]
+    branches: ["nosync"]
 
 permissions:
   contents: read
