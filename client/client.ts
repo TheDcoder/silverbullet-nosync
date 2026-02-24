@@ -302,10 +302,6 @@ export class Client {
     client.editorView.dispatch({
       effects: client.undoHistoryCompartment?.reconfigure([history()]),
     });
-
-    // Asynchronously update caches
-    this.updatePageListCache().catch(console.error);
-    this.updateDocumentListCache().catch(console.error);
   }
 
   initSpace() {

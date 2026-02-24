@@ -111,37 +111,13 @@ self.addEventListener("message", async (event: any) => {
       break;
     }
     case "wipe-data": {
-      if (proxyRouter.syncEngine) {
-        await proxyRouter.syncEngine.wipe();
-        broadcastMessage({
-          type: "dataWiped",
-        });
-      } else {
-        console.warn("Not performing sync data wipe, sync engine not started");
-      }
+      broadcastMessage({type: "dataWiped"});
       break;
     }
     case "perform-file-sync": {
-      if (proxyRouter.syncEngine) {
-        await proxyRouter.syncEngine.syncSingleFile(
-          message.path,
-        );
-      } else {
-        console.warn(
-          "Ignoring perform-file-sync request, proxy not configured yet",
-        );
-      }
-
       break;
     }
     case "perform-space-sync": {
-      if (proxyRouter.syncEngine) {
-        await proxyRouter.syncEngine.syncSpace();
-      } else {
-        console.warn(
-          "Ignoring perform-space-sync request, proxy not configured yet",
-        );
-      }
       break;
     }
     case "get-encryption-key": {
@@ -159,20 +135,6 @@ self.addEventListener("message", async (event: any) => {
     }
     case "config": {
       const config = message.config;
-      // Configure the service worker if it hasn't been already
-      if (isConfigured()) {
-        console.info(
-          "Service worker already configured, just updating configs",
-        );
-        proxyRouter.syncEngine!.setSyncConfig({
-          syncDocuments: config.syncDocuments,
-          syncIgnore: config.syncIgnore,
-        });
-
-        return;
-      } else {
-        console.info("Service being configured with", config);
-      }
       if (configuring) {
         console.info("Configuration already in progress, skipping");
         return;
@@ -248,65 +210,6 @@ self.addEventListener("message", async (event: any) => {
             });
           },
         );
-
-        // Now let's setup sync
-        const syncEngine = new SyncEngine(kv, local, remote);
-        syncEngine.setSyncConfig({
-          syncDocuments: config.syncDocuments,
-          syncIgnore: config.syncIgnore,
-        });
-        await syncEngine.start();
-
-        // Ok, we're ready to go, let's plug in the proxy router
-        proxyRouter.configure(syncEngine);
-
-        // And wire up some events
-        proxyRouter.on({
-          observedRequest: (path) => {
-            // This is triggered for the currently open file, we want to proactively sync it to keep it up to date
-            syncEngine.syncSingleFile(path);
-          },
-          onlineStatusUpdated: (isOnline) => {
-            broadcastMessage({
-              type: "online-status",
-              isOnline,
-            });
-          },
-        });
-        syncEngine.on({
-          syncProgress: (status) => {
-            broadcastMessage({
-              type: "sync-status",
-              status,
-            });
-          },
-          syncConflict: (path) => {
-            console.warn("Sync conflict detected:", path);
-            broadcastMessage({
-              type: "sync-conflict",
-              path,
-            });
-          },
-          spaceSyncComplete: (operations) => {
-            broadcastMessage({
-              type: "space-sync-complete",
-              operations,
-            });
-          },
-          fileSyncComplete: (path, operations) => {
-            broadcastMessage({
-              type: "file-sync-complete",
-              path,
-              operations,
-            });
-          },
-          syncError: (error) => {
-            broadcastMessage({
-              type: "sync-error",
-              message: error.message,
-            });
-          },
-        });
       } finally {
         // Unlock mutex
         configuring = false;
@@ -398,5 +301,5 @@ self.addEventListener("activate", (event: any) => {
 console.log("Service worker loaded");
 
 function isConfigured() {
-  return !!proxyRouter.syncEngine;
+  return true;
 }
