@@ -33,6 +33,10 @@ Deno.test("[Lua] Load tests", async () => {
   await runLuaTest("./stdlib/load_test.lua");
 });
 
+Deno.test("[Lua] Core language (truthiness)", async () => {
+  await runLuaTest("./stdlib/table_test.lua");
+});
+
 Deno.test("[Lua] Core language (length)", async () => {
   await runLuaTest("./len_test.lua");
 });
@@ -51,6 +55,10 @@ Deno.test("[Lua] Pattern tests", async () => {
 
 Deno.test("[Lua] String tests", async () => {
   await runLuaTest("./stdlib/string_test.lua");
+});
+
+Deno.test("[Lua] String pack/unpack/packsize tests", async () => {
+  await runLuaTest("./stdlib/string_pack_test.lua");
 });
 
 Deno.test("[Lua] Space Lua tests", async () => {
@@ -85,7 +93,44 @@ Deno.test("[Lua] Lume functions tests", async () => {
   await runLuaTest("./lume_test.lua");
 });
 
+Deno.test("[Lua] Lua Integrated Query tests", async () => {
+  await runLuaTest("./query_test.lua");
+});
+
 async function runLuaTest(luaPath: string) {
+  if (
+    typeof globalThis.client !== "undefined" &&
+    globalThis.client &&
+    typeof globalThis.client === "object"
+  ) {
+    if (
+      !globalThis.client.config ||
+      typeof globalThis.client.config.get !== "function"
+    ) {
+      try {
+        Object.defineProperty(globalThis.client, "config", {
+          value: {
+            get(_key: string, fallback: unknown) {
+              return fallback ?? {};
+            },
+          },
+          configurable: true,
+          writable: true,
+        });
+      } catch {
+        // ignore
+      }
+    }
+  } else {
+    (globalThis as any).client = {
+      config: {
+        get(_key: string, fallback: unknown) {
+          return fallback ?? {};
+        },
+      },
+    };
+  }
+
   const luaFile = await Deno.readTextFile(
     fileURLToPath(new URL(luaPath, import.meta.url)),
   );

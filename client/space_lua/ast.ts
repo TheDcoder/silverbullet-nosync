@@ -175,7 +175,8 @@ export type LuaExpression =
   | LuaUnaryExpression
   | LuaTableConstructor
   | LuaFunctionDefinition
-  | LuaQueryExpression;
+  | LuaQueryExpression
+  | LuaFilteredCallExpression;
 
 export type LuaNilLiteral = {
   type: "Nil";
@@ -281,6 +282,13 @@ export type LuaFunctionDefinition = {
   body: LuaFunctionBody;
 } & ASTContext;
 
+// Aggregate with per-row filter
+export type LuaFilteredCallExpression = {
+  type: "FilteredCall";
+  call: LuaFunctionCallExpression;
+  filter: LuaExpression;
+} & ASTContext;
+
 // Query stuff
 export type LuaQueryExpression = {
   type: "Query";
@@ -292,7 +300,9 @@ export type LuaQueryClause =
   | LuaWhereClause
   | LuaLimitClause
   | LuaOrderByClause
-  | LuaSelectClause;
+  | LuaSelectClause
+  | LuaGroupByClause
+  | LuaHavingClause;
 
 export type LuaFromClause = {
   type: "From";
@@ -320,9 +330,21 @@ export type LuaOrderBy = {
   type: "Order";
   expression: LuaExpression;
   direction: "asc" | "desc";
+  nulls?: "first" | "last";
+  using?: string | LuaFunctionBody;
 } & ASTContext;
 
 export type LuaSelectClause = {
   type: "Select";
+  expression: LuaExpression;
+} & ASTContext;
+
+export type LuaGroupByClause = {
+  type: "GroupBy";
+  expressions: LuaExpression[];
+} & ASTContext;
+
+export type LuaHavingClause = {
+  type: "Having";
   expression: LuaExpression;
 } & ASTContext;

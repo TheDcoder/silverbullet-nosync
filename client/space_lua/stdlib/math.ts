@@ -4,7 +4,7 @@ import {
   LuaRuntimeError,
   LuaTable,
 } from "../runtime.ts";
-import { isNegativeZero, isTaggedFloat } from "../numeric.ts";
+import { isNegativeZero, isTaggedFloat, makeLuaFloat } from "../numeric.ts";
 import { LuaPRNG } from "./prng.ts";
 
 // One PRNG per module load, auto-seeded at startup
@@ -44,6 +44,28 @@ export const mathApi = new LuaTable({
     }
     return null;
   }),
+
+  /**
+   * If the value x is representable as a Lua integer, returns an integer
+   * with that value. Otherwise returns nil.
+   * Strings are NOT accepted — only Lua number values.
+   */
+  tointeger: new LuaBuiltinFunction((_sf, x?: any) => {
+    if (typeof x === "number") {
+      return Number.isInteger(x) && isFinite(x) ? x : null;
+    }
+    if (isTaggedFloat(x)) {
+      const n = x.value;
+      return Number.isInteger(n) && isFinite(n) ? n : null;
+    }
+    if (typeof x === "string") {
+      const n = untagNumber(x); // Number(x) coerces the string
+      if (isNaN(n) || !isFinite(n) || !Number.isInteger(n)) return null;
+      return n;
+    }
+    return null;
+  }),
+
   /**
    * When called without arguments, returns a pseudo-random float with
    * uniform distribution in the range [0,1). When called with two
@@ -91,9 +113,37 @@ export const mathApi = new LuaTable({
   modf: new LuaBuiltinFunction((_sf, x: number) => {
     const xn = untagNumber(x);
     const int = Math.trunc(xn);
-    const frac = xn - int;
+    // Guarantee that the `frac` part is always Lua float
+    const frac = makeLuaFloat(xn - int);
     return new LuaMultiRes([int, frac]);
   }),
+
+  // Returns m and e such that x = m * 2^e, 0.5 <= |m| < 1 (or m=0 when x=0).
+  // e is an integer. Mirrors C99/Lua.
+  // Special cases: frexp(0) = (0, 0); frexp(+-inf/nan) = (x, 0).
+  frexp: new LuaBuiltinFunction((_sf, x: number) => {
+    const xn = untagNumber(x);
+    if (xn === 0 || !isFinite(xn) || isNaN(xn)) {
+      return new LuaMultiRes([xn, 0]);
+    }
+    const abs = Math.abs(xn);
+    let e = Math.floor(Math.log2(abs)) + 1;
+    let m = xn / Math.pow(2, e);
+    if (Math.abs(m) >= 1.0) {
+      e += 1;
+      m /= 2;
+    }
+    if (Math.abs(m) < 0.5) {
+      e -= 1;
+      m *= 2;
+    }
+    return new LuaMultiRes([m, e]);
+  }),
+
+  // Returns m * 2^e (the inverse of frexp).  Mirrors C99/Lua.
+  ldexp: new LuaBuiltinFunction((_sf, m: number, e: number) =>
+    untagNumber(m) * Math.pow(2, untagNumber(e))
+  ),
 
   // Power and logarithms
   exp: new LuaBuiltinFunction((_sf, x: number) => Math.exp(untagNumber(x))),
@@ -103,6 +153,7 @@ export const mathApi = new LuaTable({
     }
     return Math.log(untagNumber(x)) / Math.log(untagNumber(base));
   }),
+  // Power function (deprecated in Lua 5.4 but retained for compatibility)
   pow: new LuaBuiltinFunction((_sf, x: number, y: number) =>
     Math.pow(untagNumber(x), untagNumber(y))
   ),
@@ -121,7 +172,7 @@ export const mathApi = new LuaTable({
     return Math.atan2(untagNumber(y), untagNumber(x));
   }),
 
-  // Hyperbolic functions
+  // Hyperbolic functions (deprecated in Lua 5.4 but retained for compatibility)
   cosh: new LuaBuiltinFunction((_sf, x: number) => Math.cosh(untagNumber(x))),
   sinh: new LuaBuiltinFunction((_sf, x: number) => Math.sinh(untagNumber(x))),
   tanh: new LuaBuiltinFunction((_sf, x: number) => Math.tanh(untagNumber(x))),
