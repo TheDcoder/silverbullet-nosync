@@ -182,12 +182,60 @@ export function nodeAtPos(tree: ParseTree, pos: number): ParseTree | null {
     if (n && n.text !== undefined) {
       // Got a text node, let's return its parent
       return tree;
-    } else if (n) {
+    }
+    if (n) {
       // Got it
       return n;
     }
   }
   return null;
+}
+
+// Ensure a TableRow/TableHeader has a TableCell between every pair of
+// TableDelimiters, and optionally pad to match columnCount.
+// headerHasLeadingDelim indicates whether the header starts with a delimiter.
+export function normalizeTableRow(
+  row: ParseTree,
+  columnCount?: number,
+  headerHasLeadingDelim?: boolean,
+): void {
+  const children = row.children;
+  if (!children) return;
+  const normalized: ParseTree[] = [];
+  let lookingForCell = false;
+  for (const child of children) {
+    if (child.type === "TableDelimiter" && lookingForCell) {
+      normalized.push({ type: "TableCell", children: [] });
+    }
+    if (child.type === "TableDelimiter") {
+      lookingForCell = true;
+    }
+    if (child.type === "TableCell") {
+      lookingForCell = false;
+    }
+    normalized.push(child);
+  }
+  row.children = normalized;
+
+  // Fix leading-pipe mismatch: row has leading delimiter but header doesn't
+  if (headerHasLeadingDelim === false) {
+    if (row.children.length > 0 && row.children[0].type === "TableDelimiter") {
+      // Insert empty cell after the leading delimiter
+      row.children.splice(1, 0, { type: "TableCell", children: [] });
+    }
+  }
+
+  // Pad trailing empty cells to match header column count
+  if (columnCount !== undefined) {
+    let cellCount = 0;
+    for (const child of row.children) {
+      if (child.type === "TableCell") cellCount++;
+    }
+    while (cellCount < columnCount) {
+      row.children.push({ type: "TableCell", children: [] });
+      cellCount++;
+    }
+  }
 }
 
 // Turn ParseTree back into text
